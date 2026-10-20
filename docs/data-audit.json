@@ -1,0 +1,19 @@
+{
+  "checked_at": "2026-10-20",
+  "scope": "Input data validation only; no R forecasting models fitted.",
+  "source_file": "data/raw/sept11n.md",
+  "source_sha256": "0c97c930909e8012595d32d3007dd997d347895733f8b6228dacc8be70b39c9b",
+  "csv_file": "data/raw/sept11_travel.csv",
+  "csv_sha256": "afe75f37bf17cf95b8df21779264de25633cbeb27bee1fb26d7460d54a514169",
+  "conversion_preserves_all_source_cells": true,
+  "wide_rows": 172,
+  "long_rows": 516,
+  "first_month": "1990-01-01",
+  "last_month": "2004-04-01",
+  "duplicate_months": 0,
+  "missing_months": 0,
+  "missing_or_nonfinite_values": 0,
+  "nonpositive_values": 0,
+  "pre_event_months": 140,
+  "post_event_months": 32
+}

@@ -1,0 +1,12 @@
+.Rhistory
+.RData
+.Ruserdata
+.Rproj.user/
+renv/library/
+renv/staging/
+.quarto/
+*_cache/
+*_files/
+.DS_Store
+Thumbs.db
+
