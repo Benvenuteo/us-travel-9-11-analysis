@@ -8,7 +8,6 @@ Projekt portfolio obejmuje kontrolę danych, eksplorację sezonowości, STL, sze
 
 **[Raport HTML](reports/travel_9_11.html)** · [Źródło Quarto](reports/travel_9_11.qmd) · [Tabele wynikowe](outputs/tables) · [Plan i protokół](docs/project-plan.md)
 
-GitHub pokazuje kod plików HTML. Aby przeczytać gotowy raport, pobierz go przyciskiem **Download raw file** i otwórz w przeglądarce. Raport jest samodzielny: wykresy i zasoby są osadzone w pliku.
 
 | Szereg | Wybrany model | MASE w walidacji 1–12 mies. | Odchylenie pierwszych 12 mies. | Odchylenie całych 32 mies. |
 | --- | --- | ---: | ---: | ---: |
