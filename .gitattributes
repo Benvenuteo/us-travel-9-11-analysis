@@ -1,0 +1,11 @@
+*.R text eol=lf
+*.qmd text eol=lf
+*.md text eol=lf
+*.csv text eol=lf
+*.json text eol=lf
+*.html text eol=lf
+*.png binary
+outputs/** linguist-generated=true
+reports/*.html linguist-generated=true
+renv.lock linguist-generated=true
+renv/activate.R linguist-vendored=true

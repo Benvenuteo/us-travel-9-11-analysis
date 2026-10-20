@@ -1,0 +1,20 @@
+project:
+  type: default
+  execute-dir: project
+lang: pl
+format:
+  html:
+    theme: cosmo
+    toc: true
+    toc-depth: 2
+    number-sections: true
+    embed-resources: true
+    html-math-method: mathml
+    code-fold: true
+    code-summary: "Pokaż kod"
+    smooth-scroll: true
+execute:
+  echo: false
+  warning: false
+  message: false
+  freeze: false

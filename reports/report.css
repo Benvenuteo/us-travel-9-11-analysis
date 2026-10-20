@@ -1,0 +1,10 @@
+body { color: #18243a; }
+.quarto-title-block .title { max-width: 950px; }
+.subtitle { color: #52657e; }
+main { max-width: 1120px; }
+table { font-size: 0.88rem; }
+thead { background: #edf3f9; }
+th, td { padding: 0.45rem 0.65rem !important; }
+.quarto-figure { margin: 1.8rem 0; }
+figcaption, .table-caption { color: #52657e; }
+img { max-width: 100%; }

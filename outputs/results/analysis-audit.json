@@ -1,0 +1,27 @@
+{
+  "source_sha256": "afe75f37bf17cf95b8df21779264de25633cbeb27bee1fb26d7460d54a514169",
+  "complete_months": 172,
+  "series": 3,
+  "train_months": 140,
+  "post_months": 32,
+  "folds": 23,
+  "complete_long_folds": 17,
+  "latest_validation_month": "2001 Aug",
+  "selected_models": [
+    {
+      "Travel": "Air",
+      "Model": "ARIMA"
+    },
+    {
+      "Travel": "Car",
+      "Model": "ARIMA"
+    },
+    {
+      "Travel": "Rail",
+      "Model": "SNaive"
+    }
+  ],
+  "model_selection_uses_post_event_data": false,
+  "warning_count": 5,
+  "R_version": "4.5.1"
+}

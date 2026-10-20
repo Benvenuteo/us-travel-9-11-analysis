@@ -1,0 +1,405 @@
+---
+title: "Transport w USA po 11 września 2001 r."
+subtitle: "Prognozy na podstawie wcześniejszych danych i analiza odchyleń"
+author: "Benvenuteo"
+date: "2026-10-20"
+date-format: "D MMMM YYYY"
+format:
+  html:
+    output-file: travel_9_11.html
+    css: report.css
+---
+
+```{r}
+#| label: report-setup
+suppressPackageStartupMessages({
+  library(dplyr)
+  library(tidyr)
+  library(knitr)
+  library(tsibble)
+})
+source("R/data.R", encoding = "UTF-8")
+results <- readRDS("outputs/results/analysis.rds")
+first_year <- results$impact |> filter(Months == 12L)
+full_period <- results$impact |> filter(Months == 32L)
+fmt <- function(x, digits = 2L) formatC(x, format = "f", digits = digits,
+                                      decimal.mark = ",", big.mark = " ")
+gap_for <- function(travel, months = 12L) {
+  results$impact |> filter(Travel == travel, Months == months) |> pull(GapPct)
+}
+model_for <- function(travel) results$best |> filter(Travel == travel) |> pull(Model)
+display_table <- function(table, digits = 2L) {
+  knitr::kable(table, format = "html", digits = digits, escape = TRUE,
+               format.args = list(big.mark = " ", decimal.mark = ","))
+}
+metric_table <- function(table) {
+  attach_units(table) |>
+    mutate(RMSE = RMSE / PlotDivisor, MAE = MAE / PlotDivisor) |>
+    select(Szereg = Travel, Model, MASE, RMSE, MAE, `MAPE (%)` = MAPE)
+}
+figure <- function(name) {
+  knitr::include_graphics(normalizePath(file.path("outputs/figures", paste0(name, ".png"))))
+}
+```
+
+# Najważniejsze wyniki
+
+Analiza porównuje miesięczne obserwacje po wrześniu 2001 r. z prognozami wyznaczonymi wyłącznie na podstawie danych sprzed tego miesiąca. Model wybrano oddzielnie dla każdego środka transportu, wykorzystując wcześniejszą walidację czasową. **Wyniki są odchyleniami od scenariusza modelowego, a nie samodzielnym dowodem efektu przyczynowego zamachów.**
+
+```{r}
+#| label: tbl-main-results
+#| tbl-cap: "Pierwsze 12 miesięcy po zdarzeniu: IX 2001–VIII 2002."
+first_year |>
+  transmute(Szereg = Travel, Model,
+            `Odchylenie skumulowane (%)` = GapPct,
+            `Miesiące poniżej dolnej granicy 95%` = MonthsBelow95) |>
+  display_table()
+```
+
+W pierwszym roku lotnicze pasażerom mile były o **`r fmt(abs(gap_for("Air")))`% `r ifelse(gap_for("Air") < 0, "niższe", "wyższe")`** od sumy wartości prognozowanych przez model `r model_for("Air")`. Analogiczne odchylenie dla kolei wyniosło **`r fmt(gap_for("Rail"))`%**, a dla przebiegu pojazdów drogowych **`r fmt(gap_for("Car"))`%**. Wielkości te mają wspólną interpretację procentową, ale dotyczą różnych miar transportu.
+
+```{r}
+#| label: fig-selected-main
+#| fig-cap: "Obserwacje i prognozy wybranych modeli. Zacienienie oznacza miesięczne przedziały predykcji."
+figure("10_selected_forecasts")
+```
+
+# Problem badawczy i dane
+
+## Cel, pytania i kryteria jakości
+
+Celem jest ocena skali i utrzymywania się zmian w transporcie względem wcześniejszych wzorców trendu i sezonowości. Badanie odpowiada na pytania: jak duże były różnice dla lotnictwa, czy utrzymywały się w kolejnych miesiącach i jak wyglądały na tle kolei oraz ruchu drogowego.
+
+Główny horyzont interpretacji to pierwsze 12 miesięcy po zdarzeniu. Okna 3 i 6 miesięcy pokazują początkową dynamikę, a 32 miesiące pełną dostępną ścieżkę. Sukces metodologiczny oznacza poprawne jednostki, brak informacji z przyszłości przy wyborze modelu, porównywalne miary błędu, jawną niepewność i możliwość odtworzenia analizy. Z góry nie zakładamy zwycięstwa bardziej złożonego modelu.
+
+## Źródło i znaczenie zmiennych
+
+Załączony zbiór odpowiada zakresowi od stycznia 1990 do kwietnia 2004 r. tabeli C1 raportu *Estimated Impacts of September 11th on US Travel* Bureau of Transportation Statistics (BTS). W repozytorium zachowano oryginał Markdown i jego bezstratną konwersję do CSV.
+
+| Szereg | Znaczenie | Jednostka źródłowa | Jednostka na wykresach |
+|---|---|---|---|
+| Air | Lotnicze revenue passenger miles | tys. pasażerom mil | mld pasażerom mil |
+| Rail | Kolejowe passenger miles | pasażerom mile | mln pasażerom mil |
+| Car | Vehicle miles traveled (VMT) | mld mil pojazdów | mld mil pojazdów |
+
+Pasażerom mile są miarą pracy przewozowej, a nie liczbą pasażerów. Nazwa `Car` jest skrótem roboczym: seria VMT dotyczy przebiegu pojazdów drogowych i nie mierzy liczby pasażerów ani wyłącznie samochodów osobowych. Według opisu BTS dane nie rozdzielają podróży lokalnych i dalekobieżnych. Nie można więc ograniczać wniosków do samych podróży dalekobieżnych ani sumować tych trzech serii.
+
+Źródła: [tabela C1 BTS](https://www.bts.gov/archive/publications/estimated_impacts_of_9_11_on_us_travel/table_c01) i [opis zakresu w rozdziale 2](https://www.bts.gov/archive/publications/estimated_impacts_of_9_11_on_us_travel/chapter_02). Analiza pozostaje przy dostarczonych kompletnych miesiącach; nie uzupełniano późniejszego niekompletnego wiersza widocznego na stronie źródłowej.
+
+## Kontrola jakości i preprocessing
+
+Zbiór zawiera **172 miesiące, 3 szeregi i 516 obserwacji w formacie długim**. Kontrola nie wykazała brakujących miesięcy, duplikatów, braków danych, wartości nieskończonych ani niedodatnich. Nie stosowano imputacji. Obserwacji z września 2001 r. nie usunięto jako wartości odstającej: stanowi ona przedmiot badania.
+
+W R dane wczytano jako `tibble`, przekształcono przez `pivot_longer()` i zapisano jako miesięczny `tsibble` z kluczem `Travel` i indeksem `Month`. Wartości źródłowe są zachowane; przeliczenia jednostek służą wyłącznie prezentacji.
+
+```{r}
+#| label: tbl-descriptive
+#| tbl-cap: "Statystyki opisowe całej próby, po przeliczeniu do jednostek prezentacyjnych."
+results$description |>
+  attach_units() |>
+  transmute(Szereg = Travel, N,
+            Minimum = Minimum / PlotDivisor, Mediana = Median / PlotDivisor,
+            Średnia = Mean / PlotDivisor, Maksimum = Maximum / PlotDivisor,
+            `Odchylenie standardowe` = SD / PlotDivisor) |>
+  display_table()
+```
+
+# Eksploracja i sezonowość
+
+```{r}
+#| label: fig-history
+#| fig-cap: "Pełna historia w odrębnych jednostkach i skalach."
+figure("01_history")
+```
+
+Lotnictwo i ruch drogowy wykazują długookresowy wzrost przed zdarzeniem, a kolej ma bardziej zmienny poziom i wyraźniejsze zmiany kierunku. We wszystkich seriach występuje cykl roczny. Dlatego porównanie sierpnia i września bez uwzględnienia sezonowości byłoby mylące.
+
+```{r}
+#| label: fig-index
+#| fig-cap: "Porównanie względne z normalizacją do średniej sprzed zdarzenia."
+figure("02_indexed")
+```
+
+## Wykresy sezonowe i podszeregów
+
+Poniższe wykresy wykorzystują wyłącznie próbę sprzed września 2001 r. Wykresy sezonowe porównują miesiące kolejnych lat, a podszeregi pokazują ewolucję wartości dla tego samego miesiąca.
+
+```{r}
+#| label: fig-seasons
+#| fig-cap: "Roczne wzorce sezonowe lotnictwa, kolei i ruchu drogowego."
+figure("03_season_Air")
+figure("03_season_Rail")
+figure("03_season_Car")
+```
+
+```{r}
+#| label: fig-subseries
+#| fig-cap: "Podszeregi miesięczne dla trzech miar transportu."
+figure("04_subseries_Air")
+figure("04_subseries_Rail")
+figure("04_subseries_Car")
+```
+
+## Korelacje i autokorelacja
+
+ACF opisuje zależność pojedynczego szeregu od jego własnych opóźnień. Korelacje między środkami transportu wyznaczono osobno. Porównano poziomy i roczne zmiany logarytmiczne, aby ocenić, jak silnie wynik zależy od wspólnego trendu i wzorca sezonowego.
+
+```{r}
+#| label: tbl-correlations
+#| tbl-cap: "Opisowe korelacje Pearsona przed i po zdarzeniu."
+results$correlations |>
+  mutate(Period = recode(Period, Pre = "Przed", Post = "Po"),
+         Measure = recode(Measure, Value = "Poziomy", AnnualLogChange = "Zmiany log r/r")) |>
+  transmute(Okres = Period, Miara = Measure, Para = paste(First, Second, sep = "–"),
+            N, Korelacja = Correlation) |>
+  display_table(3L)
+```
+
+Wysoka korelacja poziomów może wynikać ze wspólnego trendu lub sezonowości. Korelacje zmian rok do roku są także opisowe: transformacja nie gwarantuje niezależności obserwacji. Krótka próba po zdarzeniu oraz różne definicje miar dodatkowo ograniczają porównanie. Wyniki nie dowodzą przepływu tych samych pasażerów między środkami transportu.
+
+```{r}
+#| label: fig-acf
+#| fig-cap: "Autokorelacja miesięcznych serii w próbie uczącej."
+figure("07_acf")
+```
+
+# Dekompozycja STL
+
+Dla każdego szeregu zastosowano STL w próbie uczącej, ze stałym wzorcem sezonowym (`season(window = "periodic")`). Dekompozycja w oryginalnej skali ma postać addytywną: obserwacja = trend + sezonowość + reszta.
+
+```{r}
+#| label: fig-stl
+#| fig-cap: "STL na danych sprzed zdarzenia; każda seria pozostaje w jednostkach źródłowych."
+figure("05_stl_Air")
+figure("05_stl_Rail")
+figure("05_stl_Car")
+```
+
+Ocena addytywności i multiplikatywności jest wizualna. **W analizie opisowej przyjmujemy przybliżenie addytywne dla wszystkich trzech szeregów.** Dla Air wzrost amplitudy bezwzględnej jest umiarkowany w porównaniu ze wzrostem poziomu; dla Car amplituda w milach pozostaje dość stabilna. W Rail wahania sezonowe nie zmniejszają się proporcjonalnie do spadku poziomu. Nie widać więc jednoznacznego, stałego mnożnika sezonowego. Jest to robocza ocena wykresów, a nie formalny test ani założenie idealnie stałej amplitudy w każdym roku.
+
+STL w zwykłej skali służy tutaj opisowi. ETS może dobierać również elementy multiplikatywne. Modele ARIMA i wszystkie punkty odniesienia są estymowane w oryginalnej skali; nie porównywano dodatkowej siatki transformacji logarytmicznych. Taki jawny, ograniczony zakres ułatwia interpretację wyników.
+
+# Prognozowanie i wybór modelu
+
+## Podział chronologiczny
+
+| Część danych | Okres | Miesiące | Zastosowanie |
+|---|---|---:|---|
+| Przed zdarzeniem | I 1990–VIII 2001 | 140 | Estymacja i wcześniejsza walidacja |
+| Po zdarzeniu | IX 2001–IV 2004 | 32 | Porównanie obserwacji z zamrożonym scenariuszem |
+
+Wrzesień jest miesiącem zdarzenia. Agregacja miesięczna nie pozwala oddzielić pierwszych dziesięciu dni od pozostałej części miesiąca.
+
+## Sześć metod
+
+| Metoda | Założenie |
+|---|---|
+| Mean | Stała prognoza równa średniej z historii |
+| Naive | Stała prognoza równa ostatniej obserwacji |
+| SNaive | Powtórzenie ostatniej dostępnej wartości z tego samego miesiąca roku |
+| Drift | Ekstrapolacja przeciętnej historycznej zmiany |
+| ETS | Automatyczny wybór modelu wygładzania wykładniczego |
+| ARIMA | Automatyczny dobór sezonowej i niesezonowej struktury ARIMA |
+
+Specyfikacje ETS i ARIMA dobierano na danych uczących w każdej iteracji. ARIMA wykorzystuje wyszukiwanie krokowe z AICc i bez przybliżania estymacji. Dobór rzędu różnicowania pozostawiono standardowym procedurom pakietu. Wyniki wszystkich metod są oceniane w tej samej skali oryginalnej.
+
+## Walidacja z rosnącym oknem
+
+Pierwsze okno uczące obejmuje 60 miesięcy. Punkt prognozy przesuwano co 3 miesiące. Otrzymano **`r nrow(results$folds)` okna** z kompletem 12 kolejnych miesięcy do oceny. Żadna oceniana obserwacja nie pochodzi z okresu po zdarzeniu. Dla kontroli długiego horyzontu dostępnych jest **`r sum(results$folds$ForecastMonths == 32L)` pełnych okien 32-miesięcznych**.
+
+Główne kryterium wyboru to MASE uśrednione po wszystkich prognozach dla horyzontów 1–12. Mianownik w każdym oknie jest średnim bezwzględnym błędem sezonowo naiwnym, obliczonym tylko na jego danych uczących z opóźnieniem 12. Przy remisie rozstrzyga RMSE, a następnie nazwa modelu. Nakładające się okna dają zależne błędy; przedstawiony ranking ma charakter porównawczy, bez testowania istotności różnic między modelami.
+
+RMSE silniej karze duże błędy; MAE opisuje przeciętne odchylenie bezwzględne; MAPE wyraża błąd procentowo, ale jest asymetryczne. MASE umożliwia porównania między skalami. MASE poniżej 1 odnosi się do sezonowego błędu referencyjnego na treningu, a nie automatycznie do zwycięstwa nad rzeczywistą prognozą SNaive w walidacji.
+
+```{r}
+#| label: tbl-validation
+#| tbl-cap: "Walidacja przed zdarzeniem; główne horyzonty 1–12 miesięcy."
+metric_table(results$cv_accuracy) |> display_table(3L)
+```
+
+W tabelach miar RMSE i MAE wyrażono odpowiednio w mld pasażerom mil dla Air, mln pasażerom mil dla Rail i mld mil pojazdów dla Car. MASE nie ma jednostki, a MAPE jest procentem.
+
+```{r}
+#| label: fig-validation
+#| fig-cap: "Porównanie MASE w walidacji sprzed zdarzenia."
+figure("08_validation")
+```
+
+```{r}
+#| label: tbl-selected
+#| tbl-cap: "Modele wybrane przed porównaniem z okresem po zdarzeniu."
+results$best |>
+  transmute(Szereg = Travel, Model, MASE,
+            `Pokrycie 80% w walidacji (%)` = 100 * Coverage80,
+            `Pokrycie 95% w walidacji (%)` = 100 * Coverage95) |>
+  display_table(3L)
+```
+
+Pokrycie oznacza odsetek rzeczywistych obserwacji mieszczących się w danym przedziale predykcji w walidacji. Odchylenie od nominalnych 80% lub 95% wskazuje ograniczenia kalibracji; samo wyznaczenie przedziału nie gwarantuje jego poprawności.
+
+Dla Car nominalny przedział 95% pokrywa **`r fmt(100 * results$best$Coverage95[results$best$Travel == "Car"])`%** obserwacji walidacyjnych. To sygnał możliwego niedoszacowania niepewności, dlatego pojedynczych wyjść późniejszych obserwacji poza ten przedział nie traktujemy jako rozstrzygających testów wpływu zdarzenia.
+
+## Dopasowanie do treningu i ocena po zdarzeniu
+
+Miary treningowe liczono na wspólnych miesiącach 13–140, aby każda metoda była oceniana na tej samej próbie. Są to błędy dopasowania z parametrami estymowanymi na całym treningu, więc nie zastępują oceny prognostycznej.
+
+```{r}
+#| label: tbl-training
+#| tbl-cap: "Błędy dopasowania w próbie uczącej."
+metric_table(results$train_accuracy) |> display_table(3L)
+```
+
+```{r}
+#| label: tbl-post-errors
+#| tbl-cap: "Błędy prognoz po zdarzeniu: wszystkie 32 miesiące, bez ponownego wyboru modelu."
+metric_table(results$post_accuracy) |> display_table(3L)
+```
+
+```{r}
+#| label: tbl-task-winners
+#| tbl-cap: "Najlepsze metody z czterech wymaganych w zadaniu; trening i okres późniejszy według RMSE."
+baseline_names <- c("Mean", "Naive", "SNaive", "Drift")
+baseline_train <- results$train_accuracy |>
+  filter(Model %in% baseline_names) |> group_by(Travel) |>
+  slice_min(RMSE, n = 1L, with_ties = FALSE) |> ungroup() |>
+  select(Travel, `Trening: najniższy RMSE` = Model)
+baseline_post <- results$post_accuracy |>
+  filter(Model %in% baseline_names) |> group_by(Travel) |>
+  slice_min(RMSE, n = 1L, with_ties = FALSE) |> ungroup() |>
+  select(Travel, `Po zdarzeniu: najniższy RMSE` = Model)
+baseline_train |> left_join(baseline_post, by = "Travel") |>
+  left_join(results$best |> select(Travel, `Wybór do scenariusza` = Model), by = "Travel") |>
+  rename(Szereg = Travel) |> display_table()
+```
+
+**Model prognostyczny** wybieramy według jakości wcześniejszych prognoz poza próbą. **Do celu badania** wykorzystujemy ten sam zamrożony model jako przybliżenie kontynuacji wcześniejszych wzorców, z zastrzeżeniem jego niepewności. Dobre dopasowanie do faktycznego spadku po zdarzeniu nie świadczy samo w sobie o dobrym scenariuszu bez tego spadku. Tabela błędów po zdarzeniu realizuje porównanie wymagane w zadaniu, ale nie służy do zmiany wybranego modelu.
+
+```{r}
+#| label: fig-baselines
+#| fig-cap: "Wspólne porównanie Mean, Naive, SNaive i Drift z obserwacjami."
+figure("09_baselines")
+```
+
+## Horyzont i wrażliwość rankingu
+
+```{r}
+#| label: fig-horizon
+#| fig-cap: "MASE w wybranych horyzontach; długie prognozy opierają się na mniejszej liczbie okien."
+figure("12_horizon_accuracy")
+```
+
+```{r}
+#| label: tbl-long-winners
+#| tbl-cap: "Najlepsze modele w dodatkowej walidacji pełnych okien 32-miesięcznych."
+results$cv_long |> group_by(Travel) |>
+  arrange(MASE, RMSE, Model, .by_group = TRUE) |> slice_head(n = 1L) |>
+  ungroup() |> metric_table() |> display_table(3L)
+```
+
+Ranking długiego horyzontu jest analizą wrażliwości i nie zmienia wcześniej ustalonego wyboru dla głównego okna 12-miesięcznego. Uśredniony wynik horyzontów 1–32 i wynik samego 32. miesiąca to różne porównania; szczegóły udostępniono w tabelach CSV.
+
+# Diagnostyka reszt
+
+Diagnostyka dotyczy innowacji modeli dopasowanych do całej próby sprzed zdarzenia, a nie błędów prognoz po nim. Obejmuje przebieg w czasie, histogram, ACF i test Ljunga–Boxa dla opóźnienia 24. Dla ARIMA stopnie swobody pomniejszono o liczbę współczynników AR i MA, także sezonowych. Dla pozostałych metod zastosowano test bez korekty parametrów; ma on charakter diagnostyczny. Innowacje modeli z błędem multiplikatywnym mogą mieć inną skalę niż reszty w jednostkach źródłowych.
+
+```{r}
+#| label: tbl-diagnostics
+#| tbl-cap: "Test Ljunga–Boxa dla innowacji wybranych modeli."
+results$diagnostics |>
+  transmute(Szereg = Travel, Model, N, Opóźnienie = Lag, `Korekta df` = FitDF,
+            Statystyka = Statistic,
+            `p-value` = format.pval(PValue, digits = 3L, eps = 0.001),
+            Ocena = ifelse(PValue < 0.05, "Sygnał autokorelacji", "Brak podstaw do odrzucenia H0")) |>
+  display_table(3L)
+```
+
+Mała wartość p sugeruje niewykorzystaną zależność czasową, co ogranicza zaufanie do modelu i jego przedziałów. Duża wartość p nie dowodzi, że reszty są białym szumem. Histogram służy ocenie kształtu rozkładu; idealna normalność nie jest warunkiem użyteczności prognozy punktowej.
+
+```{r}
+#| label: fig-residuals
+#| fig-cap: "Diagnostyka graficzna reszt wybranych modeli."
+figure("06_residuals_Air")
+figure("06_residuals_Rail")
+figure("06_residuals_Car")
+```
+
+# Odchylenia po wrześniu 2001 r.
+
+## Definicje i skala zmian
+
+Dla każdego miesiąca obliczono:
+
+$$g_t = y_t - \widehat{y}_t,\qquad
+g_t^{\%} = 100\frac{y_t-\widehat{y}_t}{\widehat{y}_t}.$$
+
+Wartość ujemna oznacza poziom niższy od prognozy. Dla okna H miesięcy procent skumulowany wynosi:
+
+$$G_H^{\%} = 100\frac{\sum_{t=1}^{H}(y_t-\widehat{y}_t)}{\sum_{t=1}^{H}\widehat{y}_t}.$$
+
+Jest to odchylenie sum, a nie zwykła średnia miesięcznych procentów. Sumy liczone są oddzielnie dla każdego szeregu. Przedziały predykcji dotyczą pojedynczych miesięcy; ich granic nie dodawano jako przedziału dla sumy. Niepewność wyboru modelu i wszystkich przyszłych szoków nie jest w pełni reprezentowana przez te przedziały.
+
+```{r}
+#| label: fig-monthly-gaps
+#| fig-cap: "Miesięczne różnice procentowe względem prognozy."
+figure("11_monthly_gaps")
+```
+
+```{r}
+#| label: tbl-event-windows
+#| tbl-cap: "Odchylenia w ustalonych oknach od września 2001 r."
+results$impact |> attach_units() |>
+  transmute(Szereg = Travel, Model, Miesiące = Months,
+            `Suma obserwacji` = ActualTotal / PlotDivisor,
+            `Suma prognoz` = ForecastTotal / PlotDivisor,
+            `Różnica sum` = GapTotal / PlotDivisor,
+            `Różnica (%)` = GapPct) |>
+  display_table()
+```
+
+Sumy i ich różnice wyrażono w jednostkach prezentacyjnych z tabeli danych: Air w mld pasażerom mil, Rail w mln pasażerom mil, Car w mld mil pojazdów.
+
+## Wrażliwość na metodę
+
+```{r}
+#| label: tbl-model-sensitivity
+#| tbl-cap: "Pierwszy rok: jak oszacowanie procentowe zmienia się między metodami."
+results$sensitivity |> filter(Months == 12L) |>
+  select(Travel, Model, GapPct) |>
+  pivot_wider(names_from = Model, values_from = GapPct) |>
+  rename(Szereg = Travel) |> display_table()
+```
+
+Rozbieżność wyników między metodami jest częścią niepewności scenariusza. Mean ignoruje wieloletni trend, Naive utrzymuje ostatni miesiąc, a Drift pomija wzorzec sezonowy. Dlatego sama rozpiętość sześciu liczb nie stanowi przedziału ufności ani zestawu równie wiarygodnych oszacowań efektu.
+
+# Wnioski i ograniczenia
+
+1. **Lotnictwo:** wybrany wcześniej model `r model_for("Air")` daje odchylenie sumy w pierwszym roku równe **`r fmt(gap_for("Air"))`%**; dla całych 32 miesięcy jest to **`r fmt(gap_for("Air", 32L))`%**. Wynik pokazuje skalę różnicy względem prognoz, a nie zmianę liczby pasażerów.
+2. **Kolej:** analogiczne wartości to **`r fmt(gap_for("Rail"))`%** i **`r fmt(gap_for("Rail", 32L))`%**, dla modelu `r model_for("Rail")`. Wniosek należy czytać wraz z diagnostyką reszt i analizą wrażliwości.
+3. **Ruch drogowy:** odchylenia wynoszą **`r fmt(gap_for("Car"))`%** w pierwszym roku i **`r fmt(gap_for("Car", 32L))`%** w pełnym okresie, według modelu `r model_for("Car")`. Miara obejmuje przebieg pojazdów, więc nie stanowi bezpośredniego dowodu wzrostu lub spadku liczby podróżujących.
+
+Prognozy reprezentują kontynuację wcześniejszych wzorców przy założeniach danego modelu. Brak grupy kontrolnej i dodatkowych zmiennych oznacza, że inne czynniki gospodarcze, zmiany podaży transportu i późniejsze zdarzenia mogą współtworzyć obserwowane różnice. Rail i Car także mogły reagować na zdarzenie, więc nie potraktowano ich jako niezakłóconych zmiennych kontrolnych dla lotnictwa. Porównanie trzech agregatów nie identyfikuje substytucji środków transportu.
+
+Wchodzenie obserwacji do szerokiego przedziału predykcji nie oznacza automatycznie pełnego powrotu do wcześniejszej ścieżki. Dla 32 miesięcy rośnie zarówno błąd ekstrapolacji, jak i możliwość wpływu innych zdarzeń. Analiza nie jest też prognozą skutków przyszłych ataków.
+
+# Odtwarzalność i materiały
+
+Kod, źródłowy zbiór danych, tabele CSV, wykresy, wersje pakietów i zapis środowiska znajdują się w repozytorium [Benvenuteo/us-travel-9-11-analysis](https://github.com/Benvenuteo/us-travel-9-11-analysis). Analizę uruchamia polecenie `Rscript scripts/run_analysis.R`, a raport `quarto render reports/travel_9_11.qmd`. Przed uruchomieniem należy odtworzyć zależności zgodnie z README.
+
+```{r}
+#| label: tbl-warnings
+if (length(results$warnings)) {
+  cat("Zarejestrowane ostrzeżenia wykonania są zapisane w pliku analysis-warnings.txt.\n\n")
+  display_table(tibble::tibble(Ostrzeżenie = results$warnings))
+} else {
+  cat("Analiza R zakończyła się bez ostrzeżeń.\n")
+}
+```
+
+Komunikaty o 12 usuniętych wierszach dotyczą brakujących początkowych reszt metody SNaive: pierwsze 12 miesięcy nie ma wcześniejszej obserwacji z tego samego miesiąca roku. Nie oznaczają usunięcia danych wejściowych. Komunikat numeryczny `NaNs produced` zachowano do audytu; kod sprawdził skończoność wszystkich końcowych prognoz, przedziałów i ocenianych błędów.
+
+```{r}
+#| include: false
+writeLines(capture.output(sessionInfo()), "outputs/results/report-session-info.txt")
+```
+
+Podstawa metodologiczna: Hyndman i Athanasopoulos, [*Forecasting: Principles and Practice*, rozdział 5](https://otexts.com/fpp3/toolbox.html). Dokumentacja implementacji: [fable](https://fable.tidyverts.org/), [fabletools](https://fabletools.tidyverts.org/), [feasts](https://feasts.tidyverts.org/) i [ggtime](https://github.com/mitchelloharawild/ggtime). Historyczny raport BTS jest kontekstem i źródłem danych; jego wyniki nie zastępują obliczeń przeprowadzonych w tym projekcie.

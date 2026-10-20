@@ -1,0 +1,30 @@
+Series: Air Model: ARIMA
+Series: Value 
+Model: ARIMA(1,0,0)(0,1,1)[12] w/ drift 
+
+Coefficients:
+         ar1     sma1   constant
+      0.6749  -0.5507  651349.27
+s.e.  0.0664   0.0768   51326.56
+
+sigma^2 estimated as 1360891175305:  log likelihood=-1970.67
+AIC=3949.35   AICc=3949.67   BIC=3960.76
+
+Series: Car Model: ARIMA
+Series: Value 
+Model: ARIMA(2,0,2)(0,1,2)[12] w/ drift 
+
+Coefficients:
+         ar1      ar2      ma1     ma2     sma1     sma2  constant
+      1.6455  -0.7398  -1.5555  0.7796  -0.5245  -0.2339    0.4704
+s.e.  0.1418   0.1393   0.1274  0.1234   0.1214   0.1483    0.0196
+
+sigma^2 estimated as 6.151:  log likelihood=-299.53
+AIC=615.07   AICc=616.28   BIC=637.88
+
+Series: Rail Model: SNaive
+Series: Value 
+Model: SNAIVE 
+
+sigma^2: 1114866993085657 
+

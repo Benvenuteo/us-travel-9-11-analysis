@@ -178,9 +178,10 @@ O jakości stanowią poprawne jednostki, walidacja czasowa, oddzielenie wyboru m
 - Hyndman i Athanasopoulos, Forecasting: Principles and Practice: https://otexts.com/fpp3/toolbox.html
 - Dokumentacja narzędzi graficznych ggtime: https://github.com/mitchelloharawild/ggtime
 
-## 8. Stan dostępu do GitHuba
+## 8. Stan realizacji
 
-20 października 2026 r. potwierdzono przez połączone konto login Benvenuteo. W dostępnych operacjach GitHuba nie ma tworzenia repozytoriów, a lokalne narzędzie gh nie jest dostępne. Nie utworzono zdalnego repozytorium.
+Repozytorium utworzono na koncie Benvenuteo. Protokół i dane opublikowano przed ukończeniem obliczeń. Zrealizowano analizę w R, walidację, porównanie modeli, diagnostykę, analizę wrażliwości i raport HTML.
 
-Paczka startowa przygotowuje materiały do pierwszego commita. Nie zawiera jeszcze estymacji modeli, końcowego raportu ani pliku renv.lock.
+Wyniki: [raport HTML](../reports/travel_9_11.html), [tabele CSV](../outputs/tables/) i [README](../README.md). Zakres ARIMA i ETS pozostał w oryginalnej skali; nie dodawano siatki transformacji. Analiza wrażliwości porównuje sześć metod i długie horyzonty. Opcjonalne porównanie z oknem ostatnich 60 miesięcy nie było potrzebne do realizacji przyjętego zakresu.
 
+Zweryfikowane środowisko: R 4.5.1 i Quarto 1.8.27; wersje pakietów zachowano w renv.lock. Wyniki nie są identyfikowanym przyczynowo efektem zamachów.

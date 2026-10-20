@@ -1,0 +1,5 @@
+NaNs produced
+Removed 12 rows containing missing values or values outside the scale range (`geom_line()`).
+Removed 12 rows containing missing values or values outside the scale range (`geom_point()`).
+Removed 12 rows containing non-finite outside the scale range (`stat_bin()`).
+Removed 12 rows containing missing values or values outside the scale range (`geom_rug()`).

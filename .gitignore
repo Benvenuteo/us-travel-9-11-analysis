@@ -9,4 +9,9 @@ renv/staging/
 *_files/
 .DS_Store
 Thumbs.db
+outputs/results/*.rds
+Rplots.pdf
 
+
+/.quarto/
+**/*.quarto_ipynb

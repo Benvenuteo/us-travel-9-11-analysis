@@ -1,0 +1,15 @@
+Package: ustravel911study
+Title: U.S. Travel Around September 2001
+Version: 1.0.0
+Authors@R: person("Benvenuteo", role = c("aut", "cre"),
+    email = "79843566+Benvenuteo@users.noreply.github.com")
+Description: Reproducible portfolio analysis of monthly U.S. air, rail and road
+    travel, with pre-event temporal validation, forecasting and transparent
+    observed-versus-forecast comparisons. This is an analysis project,
+    not an installable R package.
+License: MIT + file LICENSE
+Encoding: UTF-8
+Depends: R (>= 4.4.0)
+Imports: fpp3, fable, fabletools, feasts, tsibble, dplyr, tidyr, tibble,
+    readr, ggplot2, ggtime, lubridate, generics, distributional, jsonlite,
+    digest, patchwork, knitr, rmarkdown, renv, urca, testthat
